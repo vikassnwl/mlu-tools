@@ -16,7 +16,10 @@ def set_global_seed(seed_value):
     tf.random.set_seed(seed_value)
 
 
-def download(download_url, file_save_path):
+def download(file_url, file_save_path):
+    FILE_ID = file_url.split("/")[-2]
+    download_url = f"https://drive.google.com/uc?id={FILE_ID}&export=download"
+    
     response = requests.get(download_url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
 
