@@ -5,13 +5,17 @@ import cv2
 import os
 
 
-def grid_plot(X, y=None, class_names=None, y_preds=None, scaling_factor=2.5, total_items_to_show=25, seed=None):
+def grid_plot(X, y=None, y_preds=None, class_names=None, scaling_factor=2.5, total_items_to_show=25, seed=None):
     random.seed(seed)
-    if y is not None and y.ndim == 2 and y.shape[1] > 1:
-        y = y.argmax(axis=1)
+    if y is not None:
+        y = np.array(y, dtype=int)
+        if y.ndim == 2 and y.shape[1] > 1:
+            y = y.argmax(axis=1)
 
-    if y_preds is not None and y_preds.ndim == 2 and y_preds.shape[1] > 1:
-        y_preds = y_preds.argmax(axis=1)
+    if y_preds is not None:
+        y_preds = np.array(y_preds, dtype=int)
+        if y_preds.ndim == 2 and y_preds.shape[1] > 1:
+            y_preds = y_preds.argmax(axis=1)
 
     if isinstance(X, str):
         directory_path = X
@@ -25,7 +29,7 @@ def grid_plot(X, y=None, class_names=None, y_preds=None, scaling_factor=2.5, tot
             item_path = f"{directory_path}/{directory_items[rand_idx]}"
             image = cv2.imread(item_path)[..., ::-1]
             X.append(image)                                          
-    elif not isinstance(X, (list, np.ndarray)):
+    elif not isinstance(X, (list, np.ndarray, tuple)):
         raise(Exception("Either provide an array of images or \
                         a path to a directory containing images as the first argument."))
 
