@@ -3,6 +3,8 @@ import tensorflow as tf
 import numpy as np
 import requests
 from tqdm import tqdm
+import os
+from .data_structure import TreeNode
 
 
 def set_global_seed(seed_value):
@@ -28,3 +30,20 @@ def download(file_url, file_save_path):
             for chunk in response.iter_content(chunk_size=1024):
                 file.write(chunk)
                 bar.update(len(chunk))
+
+
+def tree(dir_pth):
+    nodes = {}
+
+    for dirpath, dirnames, filenames in sorted(os.walk(dir_pth)):
+        if os.path.dirname(dirpath) not in nodes:
+            nodes[dirpath] = TreeNode(os.path.basename(dirpath))
+        else:
+            if len(filenames):
+                child_node = TreeNode(f"{os.path.basename(dirpath)} - {len(filenames)}")
+            else:
+                child_node = TreeNode(f"{os.path.basename(dirpath)}")
+            nodes[os.path.dirname(dirpath)].add_child(child_node)
+            nodes[dirpath] = child_node
+
+    nodes[dir_pth].display()
