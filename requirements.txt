@@ -1,6 +1,7 @@
 absl-py==2.1.0
 asttokens==3.0.0
 astunparse==1.6.3
+beautifulsoup4==4.12.3
 certifi==2024.12.14
 charset-normalizer==3.4.0
 comm==0.2.2
@@ -10,9 +11,11 @@ debugpy==1.8.11
 decorator==5.1.1
 exceptiongroup==1.2.2
 executing==2.1.0
+filelock==3.16.1
 flatbuffers==24.3.25
 fonttools==4.55.3
 gast==0.6.0
+gdown==5.2.0
 google-pasta==0.2.0
 grpcio==1.68.1
 h5py==3.12.1
@@ -50,11 +53,13 @@ ptyprocess==0.7.0
 pure_eval==0.2.3
 Pygments==2.18.0
 pyparsing==3.2.0
+PySocks==1.7.1
 python-dateutil==2.9.0.post0
 pyzmq==26.2.0
 requests==2.32.3
 rich==13.9.4
 six==1.17.0
+soupsieve==2.6
 stack-data==0.6.3
 tensorboard==2.16.2
 tensorboard-data-server==0.7.2
