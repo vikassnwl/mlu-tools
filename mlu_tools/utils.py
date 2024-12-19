@@ -19,10 +19,7 @@ def set_global_seed(seed_value):
 
 
 def download(file_url, file_save_path):
-    FILE_ID = file_url.split("/")[-2]
-    download_url = f"https://drive.google.com/uc?id={FILE_ID}&export=download"
-    
-    response = requests.get(download_url, stream=True)
+    response = requests.get(file_url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
 
     with open(file_save_path, "wb") as file:
