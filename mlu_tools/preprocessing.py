@@ -1,4 +1,7 @@
 import tensorflow as tf
+import os
+import concurrent.futures
+import cv2
 
 
 def random_rotate(image, rotation_range):
@@ -111,26 +114,43 @@ def random_translate(image, width_factor, height_factor):
     return tf.squeeze(translated_image)
 
 
+def vid2frames(inp_vid_pth, out_frames_dir):
+    os.makedirs(out_frames_dir, exist_ok=True)
+    inp_vid_name = os.path.basename(inp_vid_pth)
+    inp_vid_name_wo_ext, ext = os.path.splitext(inp_vid_name)
+    vidcap = cv2.VideoCapture(inp_vid_pth)
+    is_success, image = vidcap.read()
+    frame_number = 0
+
+    while is_success:
+        save_path_and_name = f"{out_frames_dir}/{inp_vid_name_wo_ext}_frame-{frame_number}.jpg"
+        cv2.imwrite(save_path_and_name, image)
+        is_success, image = vidcap.read()
+        frame_number += 1
+
+
 def vids2frames(vids_dir, frames_dir, execution_mode="multi-processing"):
-    vid_frames_pth_list = []
+    vid_pth_list = []
+    frames_pth_list = []
     for dirpath, dirnames, filenames in os.walk(vids_dir):
         if len(filenames):
             frames_pth = f"{frames_dir}/{dirpath.split(vids_dir)[-1]}"
             for filename in filenames:
                 filepth = f"{dirpath}/{filename}"
-                vid_frames_pth_list.append([filepth, frames_pth])
+                vid_pth_list.append(filepth)
+                frames_pth_list.append(frames_pth)
 
     if execution_mode == "loop":
         # loop
-        for arg in vid_frames_pth_list:
-            process_video(arg)
+        for inp_vid_pth, out_frames_dir in zip(vid_pth_list, frames_pth_list):
+            vid2frames(inp_vid_pth, out_frames_dir)
 
     elif execution_mode == "multi-threading":
         # multi threading
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(process_video, vid_frames_pth_list)
+            executor.map(vid2frames, vid_pth_list, frames_pth_list)
 
     elif execution_mode == "multi-processing":
         # multi processing
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            executor.map(process_video, vid_frames_pth_list)
+            executor.map(vid2frames, vid_pth_list, frames_pth_list)
