@@ -109,3 +109,28 @@ def random_translate(image, width_factor, height_factor):
     )
 
     return tf.squeeze(translated_image)
+
+
+def vids2frames(vids_dir, frames_dir, execution_mode="multi-processing"):
+    vid_frames_pth_list = []
+    for dirpath, dirnames, filenames in os.walk(vids_dir):
+        if len(filenames):
+            frames_pth = f"{frames_dir}/{dirpath.split(vids_dir)[-1]}"
+            for filename in filenames:
+                filepth = f"{dirpath}/{filename}"
+                vid_frames_pth_list.append([filepth, frames_pth])
+
+    if execution_mode == "loop":
+        # loop
+        for arg in vid_frames_pth_list:
+            process_video(arg)
+
+    elif execution_mode == "multi-threading":
+        # multi threading
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.map(process_video, vid_frames_pth_list)
+
+    elif execution_mode == "multi-processing":
+        # multi processing
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            executor.map(process_video, vid_frames_pth_list)
