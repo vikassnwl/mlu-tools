@@ -21,7 +21,7 @@ def get_requirements(file_path):
 
 # Setting up
 setup(
-    name="mlu-tools",
+    name="mlu_tools",
     version=VERSION,
     author="Vikas Sanwal",
     author_email="<vikassnwl@gmail.com>",
