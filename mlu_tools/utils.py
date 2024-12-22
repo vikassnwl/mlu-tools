@@ -50,3 +50,13 @@ def tree(dir_pth):
             nodes[dirpath] = child_node
 
     nodes[dir_pth].display()
+
+
+def get_dynamic_path(path):
+    path_wo_ext, ext = os.path.splitext(path)
+    i = 2
+    while os.path.exists(path):
+        path = f"{path_wo_ext}_{i}{ext}"
+        i += 1
+    
+    return path

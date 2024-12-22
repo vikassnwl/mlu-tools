@@ -2,6 +2,12 @@ import tensorflow as tf
 import os
 import concurrent.futures
 import cv2
+import shutil
+import math
+import random
+import numpy as np
+import pandas as pd
+from .utils import get_dynamic_path
 
 
 def random_rotate(image, rotation_range):
@@ -154,3 +160,66 @@ def vids2frames(vids_dir, frames_dir, execution_mode="multi-processing"):
         # multi processing
         with concurrent.futures.ProcessPoolExecutor() as executor:
             executor.map(vid2frames, vid_pth_list, frames_pth_list)
+
+
+def perform_undersampling(dir_pth):
+    shutil.copytree(dir_pth, f"{dir_pth}_undersampled")
+    dir_pth = f"{dir_pth}_undersampled"
+    min_files_cnt = math.inf
+    for subdir in os.listdir(dir_pth):
+        subdir_pth = f"{dir_pth}/{subdir}"
+        min_files_cnt = min(min_files_cnt, len(os.listdir(subdir_pth)))
+
+    for subdir in os.listdir(dir_pth):
+        subdir_pth = f"{dir_pth}/{subdir}"
+        filenames = os.listdir(subdir_pth)
+        remove_filenames = random.sample(os.listdir(subdir_pth), len(filenames)-min_files_cnt)
+        for filename in remove_filenames:
+            filepath = f"{subdir_pth}/{filename}"
+            os.remove(filepath)
+
+
+def perform_oversampling(dir_pth, target_size):
+    if not os.path.exists(f"{dir_pth}_oversampled"):
+        shutil.copytree(dir_pth, f"{dir_pth}_oversampled")
+    dir_pth = f"{dir_pth}_oversampled"
+    max_files_cnt = -math.inf
+    for subdir in os.listdir(dir_pth):
+        subdir_pth = f"{dir_pth}/{subdir}"
+        max_files_cnt = max(max_files_cnt, len(os.listdir(subdir_pth)))
+
+    datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+        rotation_range=20,           # Randomly rotate images by up to 20 degrees
+        width_shift_range=0.2,       # Randomly shift images horizontally by up to 20% of width
+        height_shift_range=0.2,      # Randomly shift images vertically by up to 20% of height
+        shear_range=0.2,             # Apply shear transformations with a shear intensity of 20%
+        zoom_range=0.2,              # Randomly zoom images in/out by up to 20%
+        horizontal_flip=True,        # Randomly flip images horizontally
+    )
+
+    for subdir in os.listdir(dir_pth):
+        subdir_pth = f"{dir_pth}/{subdir}"
+        filenames = os.listdir(subdir_pth)
+        file_paths = [os.path.join(subdir_pth, img) for img in filenames]
+        df = pd.DataFrame({"filename": file_paths})
+        num_img_in_dir = len(filenames)
+        num_img_to_gen = max_files_cnt-num_img_in_dir
+        image_generator = datagen.flow_from_dataframe(
+            dataframe=df,
+            x_col="filename",
+            y_col=None,
+            class_mode=None,
+            batch_size=num_img_to_gen,
+            target_size=target_size
+        )
+        num_iters = int(np.ceil(num_img_to_gen/num_img_in_dir))
+        while num_iters:
+            images = next(image_generator)
+
+            # for images in image_generator: break
+            for image in images:
+                filename = "oversampled.jpg"
+                filepath = f"{subdir_pth}/{filename}"
+                cv2.imwrite(get_dynamic_path(filepath), image[..., ::-1])
+                
+            num_iters -= 1
