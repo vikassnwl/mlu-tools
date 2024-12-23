@@ -8,6 +8,7 @@ import random
 import numpy as np
 import pandas as pd
 from .utils import get_dynamic_path
+from tqdm import tqdm
 
 
 def random_rotate(image, rotation_range):
@@ -148,18 +149,20 @@ def vids2frames(vids_dir, frames_dir, execution_mode="multi-processing"):
 
     if execution_mode == "loop":
         # loop
-        for inp_vid_pth, out_frames_dir in zip(vid_pth_list, frames_pth_list):
+        for inp_vid_pth, out_frames_dir in tqdm(list(zip(vid_pth_list, frames_pth_list))):
             vid2frames(inp_vid_pth, out_frames_dir)
 
     elif execution_mode == "multi-threading":
         # multi threading
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(vid2frames, vid_pth_list, frames_pth_list)
+            results = executor.map(vid2frames, vid_pth_list, frames_pth_list)
+            for _ in tqdm(results, total=len(vid_pth_list)): pass
 
     elif execution_mode == "multi-processing":
         # multi processing
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            executor.map(vid2frames, vid_pth_list, frames_pth_list)
+            results = executor.map(vid2frames, vid_pth_list, frames_pth_list)
+            for _ in tqdm(results, total=len(vid_pth_list)): pass
 
 
 def perform_undersampling(dir_pth):
