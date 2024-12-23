@@ -19,7 +19,10 @@ def set_global_seed(seed_value):
     tf.random.set_seed(seed_value)
 
 
-def download(file_url, file_save_path, download_from="drive"):
+def download(file_url, file_save_path, download_from="drive", force=False):
+    if os.path.exists(file_save_path) and not force:
+        print("File already exists!")
+        return
     if download_from == "web":
         response = requests.get(file_url, stream=True)
         total_size = int(response.headers.get('content-length', 0))
