@@ -6,6 +6,9 @@ from tqdm import tqdm
 import os
 from .data_structure import TreeNode
 import gdown
+from yt_dlp import YoutubeDL
+import zipfile
+import tarfile
 
 
 def set_global_seed(seed_value):
@@ -63,3 +66,48 @@ def get_dynamic_path(path):
         i += 1
     
     return path
+
+
+def download_yt_playlist(playlist_url):
+    # Configure download options
+    options = {
+        'outtmpl': os.path.join('downloads', '%(title)s.%(ext)s'),
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',  # Download MP4 directly
+        'ignoreerrors': True,  # Ignore errors like private videos
+        'no_post_overwrites': True,  # Avoid overwriting the existing files
+    }
+
+    # Download the playlist
+    with YoutubeDL(options) as ydl:
+        ydl.download([playlist_url])
+
+    print("Playlist downloaded successfully as MP4!")
+
+
+def unpack_archive(file_path, target_dir=".", force=False):
+    # Extract the root directory from the archive
+    if file_path.endswith('.zip'):
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            root_dir = zip_ref.namelist()[0].split('/')[0]  # First part of the first file path
+    elif file_path.endswith('.tar') or file_path.endswith('.tar.gz') or file_path.endswith('.tgz'):
+        with tarfile.open(file_path, 'r') as tar_ref:
+            root_dir = tar_ref.getnames()[0].split('/')[0]  # First part of the first file path
+    else:
+        print("Unsupported file type")
+        return
+    
+    # Check if the root directory already exists in the target directory
+    unpacked_dir = os.path.join(target_dir, root_dir)
+    if os.path.exists(unpacked_dir) and not force:
+        print(f"{unpacked_dir} already exists. Skipping unpacking.")
+        return
+
+    # Unpack the archive
+    if file_path.endswith('.zip'):
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            zip_ref.extractall(target_dir)
+    elif file_path.endswith('.tar') or file_path.endswith('.tar.gz') or file_path.endswith('.tgz'):
+        with tarfile.open(file_path, 'r') as tar_ref:
+            tar_ref.extractall(target_dir)
+
+    print(f"Archive unpacked to {unpacked_dir}")
