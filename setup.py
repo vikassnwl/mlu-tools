@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 import codecs
 import os
+import re
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -10,13 +11,15 @@ with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
 VERSION = '0.0.12'
 DESCRIPTION = 'Contains useful functions and classes'
 
-HYPHEN_E_DOT = "-e ."
+HYPHEN_E_DOT = r"-e .+"
 def get_requirements(file_path):
     with open(file_path) as file_obj:
         requirements = file_obj.readlines()
-        requirements = [req.replace("\n", "") for req in requirements]
-        if HYPHEN_E_DOT in requirements:
-            requirements.remove(HYPHEN_E_DOT)
+        requirements = [
+            req.replace("\n", "")
+            for req in requirements
+            if not re.search(HYPHEN_E_DOT, req)
+        ]
     return requirements
 
 # Setting up
