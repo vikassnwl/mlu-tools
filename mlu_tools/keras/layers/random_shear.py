@@ -6,11 +6,12 @@ import scipy
 class RandomShear(tf.keras.layers.Layer):
     def __init__(self, shear_range, fill_mode, **kwargs):
         super(RandomShear, self).__init__(**kwargs)
-        self.shear = np.random.uniform(-shear_range, shear_range)
+        self.shear_range = shear_range
         self.fill_mode = fill_mode
 
     def call(self, inputs, training=True):
         if training:  # Only apply shear during training
+            self.shear = np.random.uniform(-self.shear_range, self.shear_range)  # Randomize shear each time
             return tf.numpy_function(self._apply_random_shear, [inputs], tf.float32)
         return inputs  # Pass-through during inference
 
