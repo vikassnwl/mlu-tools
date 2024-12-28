@@ -1,13 +1,13 @@
 import os
+from collections.abc import Iterable
 
 
-def validate_file(path, arg_name=None, valid_types=[]):
-    arg_name = "" if arg_name is None else arg_name+"="
+def validate_file(path, arg_name, valid_types=[]):
     if not os.path.exists(path):
-        raise Exception(f"{arg_name}'{path}' does not exist!")
+        raise Exception(f"{arg_name}='{path}' does not exist!")
     
     if not os.path.isfile(path):
-        raise Exception(f"{arg_name}'{path}' is not a file!")
+        raise Exception(f"{arg_name}='{path}' is not a file!")
 
     if not valid_types: return
 
@@ -27,14 +27,19 @@ def validate_file(path, arg_name=None, valid_types=[]):
         else:
             raise Exception(f"type='{valid_type}' is not implemented for function `{validate_file.__name__}`")
     else:
-        raise Exception(f"{arg_name}'{path}' is not in the specified valid_types:\n{valid_types}")
+        raise Exception(f"{arg_name}='{path}' is not in the specified valid_types:\n{valid_types}")
     
     return valid_type
     
 
-def validate_dir(path, arg_name=None):
-    arg_name = "" if arg_name is None else arg_name+"="
+def validate_dir(path, arg_name):
     if not os.path.exists(path):
-        raise Exception(f"{arg_name}'{path}' does not exist!")
+        raise Exception(f"{arg_name}='{path}' does not exist!")
     if not os.path.isdir(path):
-        raise Exception(f"{arg_name}'{path}' is not a directory!")
+        raise Exception(f"{arg_name}='{path}' is not a directory!")
+    
+
+def validate_array_like(obj, arg_name, custom_message=""):
+    custom_message = custom_message or f"'{arg_name}' must be an array-like object i.e., list, tuple, np.ndarray, etc., not {type(obj).__name__}."
+    if not isinstance(obj, Iterable) or isinstance(obj, str):
+        raise Exception(custom_message)
