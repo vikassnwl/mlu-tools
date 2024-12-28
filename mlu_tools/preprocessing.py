@@ -195,7 +195,7 @@ def perform_oversampling(dir_pth, target_size):
         rotation_range=20,           # Randomly rotate images by up to 20 degrees
         width_shift_range=0.2,       # Randomly shift images horizontally by up to 20% of width
         height_shift_range=0.2,      # Randomly shift images vertically by up to 20% of height
-        shear_range=0.2,             # Apply shear transformations with a shear intensity of 20%
+        shear_range=20,              # Apply shear transformations with a shear angle of 20 degrees
         zoom_range=0.2,              # Randomly zoom images in/out by up to 20%
         horizontal_flip=True,        # Randomly flip images horizontally
     )
