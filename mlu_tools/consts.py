@@ -1,1 +1,25 @@
-cifar10_classes = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+cifar10_classes = [
+    "airplane",
+    "automobile",
+    "bird",
+    "cat",
+    "deer",
+    "dog",
+    "frog",
+    "horse",
+    "ship",
+    "truck",
+]
+tf_built_in_random_transformations = [
+    "RandomBrightness",
+    "RandomContrast",
+    "RandomCrop",
+    "RandomFlip",
+    "RandomHeight",
+    "RandomRotation",
+    "RandomTranslation",
+    "RandomWidth",
+    "RandomZoom" "random_hue",
+    "random_jpeg_quality",
+    "random_saturation",
+]
