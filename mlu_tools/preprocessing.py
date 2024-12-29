@@ -226,3 +226,14 @@ def perform_oversampling(dir_pth, target_size):
                 cv2.imwrite(get_dynamic_path(filepath), image[..., ::-1])
                 
             num_iters -= 1
+
+
+def data_augmentation(X, factor=0.1, fill_mode="reflect"):
+    X = tf.keras.layers.RandomBrightness(factor)(X)  # valid factor 0-1
+    X = tf.keras.layers.RandomContrast(factor)(X)  # [1-lower, 1+upper], lower=upper if factor is a single value
+    X = tf.keras.layers.RandomFlip("horizontal")(X)
+    X = tf.keras.layers.RandomRotation(factor*100/360, fill_mode=fill_mode)(X)
+    X = tf.keras.layers.RandomTranslation(factor, factor, fill_mode=fill_mode)(X)
+    X = tf.keras.layers.RandomZoom(factor, fill_mode=fill_mode)(X)
+
+    return X

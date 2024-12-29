@@ -19,7 +19,8 @@ tf_built_in_random_transformations = [
     "RandomRotation",
     "RandomTranslation",
     "RandomWidth",
-    "RandomZoom" "random_hue",
+    "RandomZoom",
+    "random_hue",
     "random_jpeg_quality",
     "random_saturation",
 ]
