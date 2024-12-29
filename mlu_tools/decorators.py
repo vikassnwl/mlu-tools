@@ -15,7 +15,10 @@ from .validation import validate_array_like
 
 def handle_symbolic_tensor(func):
     def wrapper(X):
-        processed = tf.numpy_function(func, [X], [tf.float32])
-        processed[0].set_shape((None, *X.shape))
-        return processed[0]
+        processed = tf.numpy_function(func, [X], tf.float32)
+        if X.ndim == 3:
+            processed.set_shape((None, *X.shape))
+        else:
+            processed.set_shape(X.shape)
+        return processed
     return wrapper
