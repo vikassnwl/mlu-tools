@@ -1097,7 +1097,7 @@ class ImageDataGenerator:
             )
             x = self.standardize(x)
             batch_x[i] = x
-        batch_x = batch_x[0] if X.ndim==3 else batch_x
+        # batch_x = batch_x[0] if X.ndim==3 else batch_x
         return batch_x
 
 
