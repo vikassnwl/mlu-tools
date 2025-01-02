@@ -9,6 +9,11 @@ import numpy as np
 import pandas as pd
 from .utils import get_dynamic_path
 from tqdm import tqdm
+from .validation import (
+    validate_pixel_range_0_255,
+    validate_array_like,
+    validate_dir
+)
 
 
 def random_rotate(image, rotation_range):
@@ -228,12 +233,72 @@ def perform_oversampling(dir_pth, target_size):
             num_iters -= 1
 
 
-def data_augmentation(X, factor=0.1, fill_mode="reflect"):
-    X = tf.keras.layers.RandomBrightness(factor)(X)  # valid factor 0-1
-    X = tf.keras.layers.RandomContrast(factor)(X)  # [1-lower, 1+upper], lower=upper if factor is a single value
-    X = tf.keras.layers.RandomFlip("horizontal")(X)
-    X = tf.keras.layers.RandomRotation(factor*100/360, fill_mode=fill_mode)(X)
-    X = tf.keras.layers.RandomTranslation(factor, factor, fill_mode=fill_mode)(X)
-    X = tf.keras.layers.RandomZoom(factor, fill_mode=fill_mode)(X)
+class TFDataGenerator:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        fill_mode=kwargs.get("fill_mode", "reflect")
 
-    return X
+        self.transformations = []
+        if "brightness_range" in kwargs:
+            self.transformations.append(tf.keras.layers.RandomBrightness(kwargs["brightness_range"]))  # valid factor 0-1
+        if "contrast_range" in kwargs:
+            self.transformations.append(tf.keras.layers.RandomContrast(kwargs["contrast_range"]))  # [1-lower, 1+upper], lower=upper if factor is a single value
+        if "horizontal_flip" in kwargs and kwargs["horizontal_flip"]==True:
+            self.transformations.append(tf.keras.layers.RandomFlip("horizontal"))
+        if "rotation_range" in kwargs:
+            self.transformations.append(tf.keras.layers.RandomRotation(kwargs["rotation_range"]/360, fill_mode=fill_mode))
+        if "height_shift_range" in kwargs or "width_shift_range" in kwargs:
+            self.transformations.append(tf.keras.layers.RandomTranslation(kwargs.get("height_shift_range", 0), kwargs.get("width_shift_range", 0), fill_mode=fill_mode))
+        if "zoom_range" in kwargs:
+            self.transformations.append(tf.keras.layers.RandomZoom(kwargs["zoom_range"], fill_mode=fill_mode))
+        if "hue_range" in kwargs:
+            self.transformations.append(tf.keras.layers.Lambda(lambda X: tf.image.random_hue(X, kwargs["hue_range"])))
+        if "saturation_range" in kwargs:
+            self.transformations.append(tf.keras.layers.Lambda(lambda X: tf.image.random_saturation(X, *kwargs["saturation_range"])))
+        
+        # Rescale in the end of all the transformations
+        if "rescale" in kwargs:
+            self.transformations.append(tf.keras.layers.Rescaling(kwargs["rescale"]))
+
+
+    def data_loader(self, X, y=None, buffer_size=1000, batch_size=32):
+        if isinstance(X, str):
+            dataset = tf.keras.preprocessing.image_dataset_from_directory(X, batch_size=batch_size)
+        else:
+            if "brightness_range" in self.kwargs or "contrast_range" in self.kwargs:
+                custom_message = ("In order to apply brightness or contrast adjustments to the input image, pixel values must be in the range of 0 to 255."
+                    "\nEnsure that the image has appropriate pixel values, and if needed, rescale it using the rescale argument of TFDataGenerator.")
+                validate_pixel_range_0_255(X, custom_message=custom_message)
+            # Create a tf.data.Dataset from the variables
+            if y is None:
+                dataset = tf.data.Dataset.from_tensor_slices(X)
+            else:
+                dataset = tf.data.Dataset.from_tensor_slices((X, y))
+            # Shuffle and batch the dataset
+            dataset = dataset.shuffle(buffer_size).batch(batch_size)
+        if self.transformations != []:
+            # Apply data augmentation to the dataset
+            transformations_pipeline = tf.keras.Sequential(self.transformations)
+            def wrapper1(*args):
+                    return transformations_pipeline(args[0])
+            def wrapper2(*args):
+                    return transformations_pipeline(args[0]), args[1]
+            wrapper = wrapper1 if y is None and not isinstance(X, str) else wrapper2
+            dataset = dataset.map(
+                wrapper,
+                num_parallel_calls=tf.data.AUTOTUNE  # Enable parallel processing
+            )
+        # Add prefetching for performance
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
+        return dataset
+
+
+    def flow(self, X, y=None, buffer_size=1000, batch_size=32):
+        validate_array_like(X)
+        return self.data_loader(X, y, buffer_size, batch_size)
+
+
+    def flow_from_directory(self, X, buffer_size=1000, batch_size=32):
+        validate_dir(X)
+        return self.data_loader(X, buffer_size=buffer_size, batch_size=batch_size)

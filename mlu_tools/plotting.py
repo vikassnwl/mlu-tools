@@ -36,7 +36,7 @@ def grid_plot(X, y=None, y_preds=None, class_names=None, scaling_factor=2.5, tot
     else:
         custom_message = ("Either provide an array of images or "
                             "a path to a directory containing images as the first argument.")
-        validate_array_like(X, arg_name="X", custom_message=custom_message)
+        validate_array_like(X, custom_message=custom_message)
 
     # X = X[:total_items_to_show]
     total_items_to_show = min(len(X), total_items_to_show)
