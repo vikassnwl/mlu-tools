@@ -299,6 +299,6 @@ class TFDataGenerator:
         return self.data_loader(X, y, buffer_size, batch_size)
 
 
-    def flow_from_directory(self, X, buffer_size=1000, batch_size=32):
+    def flow_from_directory(self, X, batch_size=32):
         validate_dir(X)
-        return self.data_loader(X, buffer_size=buffer_size, batch_size=batch_size)
+        return self.data_loader(X, batch_size=batch_size)
