@@ -6,7 +6,16 @@ import os
 from .validation import validate_array_like
 
 
-def grid_plot(X, y=None, y_preds=None, class_names=None, scaling_factor=2.5, total_items_to_show=25, seed=None):
+def grid_plot(
+        X, 
+        y=None, 
+        y_preds=None, 
+        class_names=None, 
+        scaling_factor=2.5, 
+        total_items_to_show=25, 
+        seed=None,
+        custom_titles=None
+    ):
     random.seed(seed)
     if y is not None:
         y = np.array(y, dtype=int)
@@ -30,13 +39,9 @@ def grid_plot(X, y=None, y_preds=None, class_names=None, scaling_factor=2.5, tot
             item_path = f"{directory_path}/{directory_items[rand_idx]}"
             image = cv2.imread(item_path)[..., ::-1]
             X.append(image)                                          
-    # elif not isinstance(X, (list, np.ndarray, tuple)):
-    #     raise(Exception("Either provide an array of images or \
-    #                     a path to a directory containing images as the first argument."))
-    else:
-        custom_message = ("Either provide an array of images or "
-                            "a path to a directory containing images as the first argument.")
-        validate_array_like(X, custom_message=custom_message)
+    elif not isinstance(X, (list, np.ndarray, tuple)):
+        raise(Exception("Either provide an array of images or \
+                        a path to a directory containing images as the first argument."))
 
     # X = X[:total_items_to_show]
     total_items_to_show = min(len(X), total_items_to_show)
@@ -57,6 +62,8 @@ def grid_plot(X, y=None, y_preds=None, class_names=None, scaling_factor=2.5, tot
                     ax.text(0, 2, class_names[y[rand_idx].item()], color='white', bbox=dict(facecolor='green'))
             else:
                 ax.set_title(class_names[y[rand_idx].item()])
+        elif custom_titles is not None:
+            ax.set_title(custom_titles[rand_idx])
         ax.axis("off")
 
 
