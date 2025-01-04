@@ -61,9 +61,10 @@ def all_cnn_model(input_shape=(32, 32, 3), num_classes=10):
     model.add(tf.keras.layers.MaxPooling2D(pool_size=2))
 
     # Fully Convolutional Layers (without fully connected layers)
-    model.add(tf.keras.layers.Conv2D(10, kernel_size=1, activation='softmax'))
+    model.add(tf.keras.layers.Conv2D(10, kernel_size=1))
 
     # Flatten and apply softmax
     model.add(tf.keras.layers.GlobalAveragePooling2D())
+    model.add(tf.keras.layers.Activation('softmax'))
 
     return model
