@@ -9,7 +9,6 @@ import gdown
 from yt_dlp import YoutubeDL
 import zipfile
 import tarfile
-import inspect
 
 
 def set_global_seed(seed_value):
@@ -112,3 +111,10 @@ def unpack_archive(file_path, target_dir=".", force=False):
             tar_ref.extractall(target_dir)
 
     print(f"Archive unpacked to {unpacked_dir}")
+
+
+def count_files(directory):
+    total_files = 0
+    for root, dirs, files in os.walk(directory):
+        total_files += len(files)
+    return total_files

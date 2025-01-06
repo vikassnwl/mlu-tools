@@ -235,6 +235,11 @@ def perform_oversampling(dir_pth, target_size):
 
 class TFDataGenerator:
     def __init__(self, **kwargs):
+        valid_args = {"brightness_range", "contrast_range", "horizontal_flip", "rotation_range", 
+                      "height_shift_range", "zoom_range", "hue_range", "saturation_range", "rescale"}
+        invalid_args = set(kwargs)-valid_args
+        if invalid_args:
+            raise Exception(f"Invalid arguments: {invalid_args}")
         self.kwargs = kwargs
         fill_mode=kwargs.get("fill_mode", "reflect")
 
@@ -261,7 +266,7 @@ class TFDataGenerator:
             self.transformations.append(tf.keras.layers.Rescaling(kwargs["rescale"]))
 
 
-    def data_loader(self, X, y=None, buffer_size=1000, batch_size=32):
+    def data_loader(self, X, y=None, buffer_size=1000, batch_size=32, extend=None):
         if isinstance(X, str):
             dataset = tf.keras.preprocessing.image_dataset_from_directory(X, batch_size=batch_size)
         else:
@@ -288,17 +293,26 @@ class TFDataGenerator:
                 wrapper,
                 num_parallel_calls=tf.data.AUTOTUNE  # Enable parallel processing
             )
+            if extend:
+                # Create an additional dataset that contains 50% of the original dataset
+                total_items = count_files(X) if isinstance(X, str) else len(X)
+                additional_data = dataset.take(int(np.ceil(total_items*extend/batch_size))).map(
+                    wrapper,
+                    num_parallel_calls=tf.data.AUTOTUNE
+                )
+                dataset = dataset.concatenate(additional_data)
+
         # Add prefetching for performance
         dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
         return dataset
 
 
-    def flow(self, X, y=None, buffer_size=1000, batch_size=32):
+    def flow(self, X, y=None, buffer_size=1000, batch_size=32, extend=None):
         validate_array_like(X)
-        return self.data_loader(X, y, buffer_size, batch_size)
+        return self.data_loader(X, y, buffer_size, batch_size, extend=extend)
 
 
-    def flow_from_directory(self, X, batch_size=32):
+    def flow_from_directory(self, X, batch_size=32, extend=None):
         validate_dir(X)
-        return self.data_loader(X, batch_size=batch_size)
+        return self.data_loader(X, batch_size=batch_size, extend=extend)
