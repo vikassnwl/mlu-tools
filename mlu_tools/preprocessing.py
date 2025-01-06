@@ -235,8 +235,8 @@ def perform_oversampling(dir_pth, target_size):
 
 class TFDataGenerator:
     def __init__(self, **kwargs):
-        valid_args = {"brightness_range", "contrast_range", "horizontal_flip", "rotation_range", 
-                      "height_shift_range", "zoom_range", "hue_range", "saturation_range", "rescale"}
+        valid_args = {"brightness_range", "contrast_range", "horizontal_flip", "rotation_range", "height_shift_range", 
+                      "width_shift_range", "zoom_range", "hue_range", "saturation_range", "rescale"}
         invalid_args = set(kwargs)-valid_args
         if invalid_args:
             raise Exception(f"Invalid arguments: {invalid_args}")
