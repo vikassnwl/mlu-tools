@@ -68,11 +68,18 @@ def get_dynamic_path(path):
     return path
 
 
-def download_yt_playlist(playlist_url):
+def download_yt_playlist(playlist_url, quality='best'):
     # Configure download options
+    format_mapping = {
+        'low': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]',
+        'medium': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]',
+        'high': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]',
+        'best': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]'
+    }
+
     options = {
         'outtmpl': os.path.join('downloads', '%(title)s.%(ext)s'),
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',  # Download MP4 directly
+        'format': format_mapping.get(quality, 'best'),
         'ignoreerrors': True,  # Ignore errors like private videos
         'no_post_overwrites': True,  # Avoid overwriting the existing files
     }
@@ -81,7 +88,8 @@ def download_yt_playlist(playlist_url):
     with YoutubeDL(options) as ydl:
         ydl.download([playlist_url])
 
-    print("Playlist downloaded successfully as MP4!")
+    print(f"Playlist downloaded successfully as {quality} quality MP4!")
+
 
 
 def unpack_archive(file_path, target_dir=".", force=False):
