@@ -9,6 +9,7 @@ import gdown
 from yt_dlp import YoutubeDL
 import zipfile
 import tarfile
+import cv2
 
 
 def set_global_seed(seed_value):
@@ -126,3 +127,38 @@ def count_files(directory):
     for root, dirs, files in os.walk(directory):
         total_files += len(files)
     return total_files
+
+
+def video_capture(src, frame_processing_func=None):
+    # Open the video file
+    cap = cv2.VideoCapture(src)
+
+    # Get the frames per second (FPS) of the video
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # Calculate the delay in seconds between frames
+    frame_delay = 1 / fps
+
+    if not cap.isOpened():
+        print("Error: Could not open video.")
+        exit()
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame_processing_func:
+            # Process the frame (e.g., convert to grayscale)
+            frame = frame_processing_func(frame)
+
+        # Display the frame
+        cv2.imshow("Frame", frame)
+
+        # Wait for the appropriate time based on the FPS
+        key = cv2.waitKey(int(frame_delay * 1000))  # Convert seconds to milliseconds
+        if key == ord("q"):  # Press 'q' to exit
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()

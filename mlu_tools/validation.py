@@ -1,6 +1,7 @@
 import os
 from collections.abc import Iterable
 import inspect
+from pathlib import Path
 
 
 # def get_param_name(value, caller_frame):
@@ -76,3 +77,15 @@ def validate_pixel_range_0_255(X, custom_message=""):
         default_message = f"Pixel values are not in the range 0..255 for argument '{param_name}'."
         message = custom_message or default_message
         raise Exception(message)
+    
+
+def validate_dir_structure(dir_path, structure="dir>subdir>img"):
+    validate_dir(dir_path)
+    if structure == "dir>subdir>img":
+        for i, (root, dirs, files) in enumerate(os.walk(dir_path)):
+            if i == 0:
+                if not dirs or files:
+                    raise Exception(f"Structure didn't match the specified one: {structure}")
+            else:
+                if dirs or not files or not [validate_file(x, ["img"]) for x in Path(root).iterdir()]:
+                    raise Exception(f"Structure didn't match the specified one: {structure}")
