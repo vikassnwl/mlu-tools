@@ -13,6 +13,7 @@ from .validation import validate_array_like
 #         return wrapper
 #     return decorator
 
+
 def handle_symbolic_tensor(func):
     def wrapper(X):
         processed = tf.numpy_function(func, [X], tf.float32)
@@ -21,4 +22,5 @@ def handle_symbolic_tensor(func):
         else:
             processed.set_shape(X.shape)
         return processed
+
     return wrapper

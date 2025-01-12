@@ -8,10 +8,12 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = '0.0.23'
-DESCRIPTION = 'Contains useful functions and classes'
+VERSION = "0.0.23"
+DESCRIPTION = "Contains useful functions and classes"
 
 HYPHEN_E_DOT = r"-e .+"
+
+
 def get_requirements(file_path):
     with open(file_path) as file_obj:
         requirements = file_obj.readlines()
@@ -21,6 +23,7 @@ def get_requirements(file_path):
             if not re.search(HYPHEN_E_DOT, req)
         ]
     return requirements
+
 
 # Setting up
 setup(
@@ -33,7 +36,7 @@ setup(
     long_description=long_description,
     packages=find_packages(),
     install_requires=get_requirements("requirements.txt"),
-    keywords=['python'],
+    keywords=["python"],
     classifiers=[
         "Development Status :: 1 - Planning",
         "Intended Audience :: Developers",
@@ -41,5 +44,5 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows",
-    ]
+    ],
 )
