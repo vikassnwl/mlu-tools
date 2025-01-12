@@ -10,6 +10,7 @@ from yt_dlp import YoutubeDL
 import zipfile
 import tarfile
 import cv2
+from IPython.display import FileLink
 
 
 def set_global_seed(seed_value):
@@ -173,3 +174,8 @@ def video_capture(src, frame_processing_func=None):
 
     cap.release()
     cv2.destroyAllWindows()
+
+
+def create_download_link(file_path):
+    """Create a download link for the given file path."""
+    return FileLink(file_path)
