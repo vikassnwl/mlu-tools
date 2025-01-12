@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import cv2
 import tensorflow as tf
+from mlu_tools.validation import validate_array_like
 
 
 def from_arr(
@@ -72,7 +73,16 @@ def from_dir(
         title_template="{cname}"
     ):
     random.seed(seed)
-    if custom_titles is None and y is not None and y != "infer_from_dir":
+    # Prioritize custom_titles over y and y_preds
+    if custom_titles is not None or y is None:
+        y = None
+        y_preds = None
+
+    infer_from_dir = "infer_from_dir"
+    if isinstance(y, str):
+        if y != infer_from_dir:
+            raise Exception(f"'{y}' is an invalid value for y, did you mean '{infer_from_dir}'?")
+    elif validate_array_like(y, raise_exception=False):
         y = np.array(y)
         if y.ndim == 2 and y.shape[1] > 1:
             y = y.argmax(axis=1)
@@ -81,18 +91,18 @@ def from_dir(
 
     # directory_items = os.listdir(directory_path)
     directory_items = []
-    if custom_titles is None and y == "infer_from_dir":
+    if y is infer_from_dir:
         y_temp = []
         label = 0
     for root, dirs, files in os.walk(directory_path):
         # directory_items.extend(files)
         if files:
             directory_items.extend(Path(root).iterdir())
-            if custom_titles is None and y == "infer_from_dir":
+            if y is infer_from_dir:
                 y_temp.extend([label]*len(files))
                 label += 1
 
-    if custom_titles is None and y == "infer_from_dir":
+    if y is infer_from_dir:
         y = np.array(y_temp)
 
     total_items_to_show = min(len(directory_items), total_items_to_show)
@@ -100,21 +110,22 @@ def from_dir(
         rand_indices = random.sample(range(len(directory_items)), total_items_to_show)
     else:
         rand_indices = range(total_items_to_show)
+
     X = []
-    if custom_titles is None and y is not None:
+    if y is not None:
         y_temp = []
-    if custom_titles is None and y_preds is not None:
-        y_preds_temp = []
+    if y_preds is not None:
+        y_preds_temp = []  
     # for item_name in directory_items[:total_items_to_show]:
     for rand_idx in rand_indices:
         # item_path = f"{directory_path}/{item_name}"
         item_path = directory_items[rand_idx]
         image = cv2.imread(item_path)[..., ::-1]
         X.append(image)
-        if custom_titles is None and y is not None: y_temp.append(y[rand_idx])
-        if custom_titles is None and y_preds is not None: y_preds_temp.append(y_preds[rand_idx])
-    if custom_titles is None and y is not None: y = y_temp
-    if custom_titles is None and y_preds is not None: y_preds = y_preds_temp
+        if y is not None: y_temp.append(y[rand_idx])
+        if y_preds is not None: y_preds_temp.append(y_preds[rand_idx])
+    if y is not None: y = y_temp
+    if y_preds is not None: y_preds = y_preds_temp
 
     from_arr(
         X, 

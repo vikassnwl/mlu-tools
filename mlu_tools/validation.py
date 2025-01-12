@@ -64,11 +64,13 @@ def validate_dir(path):
         raise Exception(f"{param_name}='{path}' is not a directory!")
     
 
-def validate_array_like(obj, custom_message=""):
+def validate_array_like(obj, raise_exception=True, custom_message=""):
     param_name = get_param_name(obj, inspect.currentframe())
     custom_message = custom_message or f"'{param_name}' must be an array-like object i.e., list, tuple, np.ndarray, etc., not {type(obj).__name__}."
     if not isinstance(obj, Iterable) or isinstance(obj, str):
-        raise Exception(custom_message)
+        if raise_exception: raise Exception(custom_message)
+        return False
+    return True
     
 
 def validate_pixel_range_0_255(X, custom_message=""):
