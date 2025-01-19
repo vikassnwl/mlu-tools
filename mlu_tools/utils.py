@@ -179,3 +179,16 @@ def video_capture(src, frame_processing_func=None):
 def create_download_link(file_path):
     """Create a download link for the given file path."""
     return FileLink(file_path)
+
+
+def extract_num_from_end(filename):
+    filename_wo_ext = os.path.splitext(filename)[0]
+    extracted_num = ""
+    for c in filename_wo_ext[::-1]:
+        try:
+            int(c)
+            extracted_num += c
+        except:
+            break
+    
+    return int(extracted_num[::-1])

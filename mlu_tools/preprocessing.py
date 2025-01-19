@@ -7,7 +7,7 @@ import math
 import random
 import numpy as np
 import pandas as pd
-from .utils import get_dynamic_path, count_files
+from .utils import get_dynamic_path, count_files, extract_num_from_end
 from tqdm import tqdm
 from .validation import validate_pixel_range_0_255, validate_array_like, validate_dir
 
@@ -175,6 +175,18 @@ def vids2frames(vids_dir, frames_dir, execution_mode="multi-processing"):
             results = executor.map(vid2frames, vid_pth_list, frames_pth_list)
             for _ in tqdm(results, total=len(vid_pth_list)):
                 pass
+
+
+def frames2vid(frames_dir, output_video_path, fps):
+    frame = cv2.imread(f"{frames_dir}/{os.listdir(frames_dir)[0]}")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4
+    frame_size = frame.shape[1::-1]
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
+    for filename in sorted(os.listdir(frames_dir), key=extract_num_from_end):
+        file_path = f"{frames_dir}/{filename}"
+        frame = cv2.imread(file_path)
+        out.write(frame)
+    out.release()
 
 
 def perform_undersampling(dir_pth):
