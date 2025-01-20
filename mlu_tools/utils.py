@@ -11,6 +11,7 @@ import zipfile
 import tarfile
 import cv2
 from IPython.display import FileLink
+from datetime import datetime
 
 
 def set_global_seed(seed_value):
@@ -192,3 +193,11 @@ def extract_num_from_end(filename):
             break
     
     return int(extracted_num[::-1])
+
+
+def get_datetime_str():
+    # Get the current datetime
+    current_time = datetime.now()
+    # Format the datetime string
+    datetime_str = current_time.strftime("%Y%m%d_%H%M%S")
+    return datetime_str

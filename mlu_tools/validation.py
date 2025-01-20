@@ -4,28 +4,8 @@ import inspect
 from pathlib import Path
 
 
-# def get_param_name(value, caller_frame):
-#     # Get the variable name from the caller's local scope
-#     caller_locals = caller_frame.f_back.f_locals
-#     param_name = [key for key, val in caller_locals.items() if val is value]
-#     if param_name:
-#         param_name = [get_param_name(value, caller_frame.f_back)]
-#     else:
-#         # Get the variable name from the callee's local scope
-#         callee_locals = caller_frame.f_locals
-#         param_name = [key for key, val in callee_locals.items() if val is value]
-#     return param_name[0]
-
-
-def get_param_name(value, caller_frame):
-    # Get the variable name from the caller's local scope
-    caller_locals = caller_frame.f_back.f_locals
-    param_name = [key for key, val in caller_locals.items() if val is value]
-    return param_name[0]
-
-
-def validate_file(path, valid_types=[]):
-    param_name = get_param_name(path, inspect.currentframe())
+def validate_file(path, valid_types=[], raise_exception=True):
+    param_name = "path"
     if not os.path.exists(path):
         raise Exception(f"{param_name}='{path}' does not exist!")
 
@@ -74,15 +54,17 @@ def validate_file(path, valid_types=[]):
                 f"type='{valid_type}' is not implemented for function `{validate_file.__name__}`"
             )
     else:
-        raise Exception(
-            f"{param_name}='{path}' is not in the specified valid_types:\n{valid_types}"
-        )
+        if raise_exception:
+            raise Exception(
+                f"{param_name}='{path}' is not in the specified valid_types:\n{valid_types}"
+            )
+        else: return False
 
     return valid_type
 
 
 def validate_dir(path):
-    param_name = get_param_name(path, inspect.currentframe())
+    param_name = "path"
     if not isinstance(path, str):
         raise Exception(f"'{param_name}' must be a string not {type(path).__name__}.")
     if not os.path.exists(path):
@@ -92,7 +74,7 @@ def validate_dir(path):
 
 
 def validate_array_like(obj, raise_exception=True, custom_message=""):
-    param_name = get_param_name(obj, inspect.currentframe())
+    param_name = "obj"
     custom_message = (
         custom_message
         or f"'{param_name}' must be an array-like object i.e., list, tuple, np.ndarray, etc., not {type(obj).__name__}."
@@ -105,7 +87,7 @@ def validate_array_like(obj, raise_exception=True, custom_message=""):
 
 
 def validate_pixel_range_0_255(X, custom_message=""):
-    param_name = get_param_name(X, inspect.currentframe())
+    param_name = "X"
     if X.min() < 0 or X.max() <= 1:
         default_message = (
             f"Pixel values are not in the range 0..255 for argument '{param_name}'."
