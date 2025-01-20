@@ -1,185 +1,23 @@
-import tensorflow as tf
 import os
-import concurrent.futures
 import cv2
+from mlu_tools.utils import extract_num_from_end
 import shutil
-import math
 import random
 import numpy as np
+import tensorflow as tf
 import pandas as pd
-from .utils import get_dynamic_path, count_files, extract_num_from_end
-from tqdm import tqdm
-from .validation import validate_pixel_range_0_255, validate_array_like, validate_dir
-
-
-def random_rotate(image, rotation_range):
-    """Rotate the image within the specified range and fill blank space with nearest neighbor."""
-    # Generate a random rotation angle in radians
-    theta = tf.random.uniform([], -rotation_range, rotation_range) * tf.constant(
-        3.14159265 / 180, dtype=tf.float32
-    )
-
-    # Get the image dimensions
-    image_shape = tf.shape(image)
-    height, width = image_shape[0], image_shape[1]
-
-    # Create the rotation matrix
-    rotation_matrix = tf.stack(
-        [
-            [tf.cos(theta), -tf.sin(theta), 0],
-            [tf.sin(theta), tf.cos(theta), 0],
-            [0, 0, 1],
-        ]
-    )
-
-    # Adjust for center-based rotation
-    translation_to_origin = tf.stack(
-        [[1, 0, -width / 2], [0, 1, -height / 2], [0, 0, 1]]
-    )
-
-    translation_back = tf.stack([[1, 0, width / 2], [0, 1, height / 2], [0, 0, 1]])
-
-    # Cast matrices to tf.float32 for compatibility
-    rotation_matrix = tf.cast(rotation_matrix, tf.float32)
-    translation_to_origin = tf.cast(translation_to_origin, tf.float32)
-    translation_back = tf.cast(translation_back, tf.float32)
-
-    # Perform matrix multiplication
-    transform_matrix = tf.linalg.matmul(
-        translation_back, tf.linalg.matmul(rotation_matrix, translation_to_origin)
-    )
-
-    # Extract the affine part of the transformation matrix (2x3 matrix for 2D transformation)
-    affine_matrix = transform_matrix[:2, :]
-
-    # Flatten the matrix into a 1D array and add [0, 0] to make it 8 elements
-    affine_matrix_8 = tf.concat(
-        [affine_matrix[0, :], affine_matrix[1, :], [0, 0]], axis=0
-    )
-
-    # Apply the transformation with `fill_mode="nearest"`
-    rotated_image = tf.raw_ops.ImageProjectiveTransformV2(
-        images=tf.expand_dims(image, 0),
-        transforms=tf.reshape(affine_matrix_8, [1, 8]),
-        output_shape=tf.shape(image)[:2],
-        interpolation="BILINEAR",
-        fill_mode="NEAREST",
-    )
-
-    return tf.squeeze(rotated_image)
-
-
-def random_translate(image, width_factor, height_factor):
-    """Randomly translate the image horizontally and vertically within the specified factors.
-
-    Args:
-        image: Input image tensor.
-        width_factor: Horizontal shift factor (0.1 means 10% of width).
-        height_factor: Vertical shift factor (0.1 means 10% of height).
-
-    Returns:
-        Translated image.
-    """
-    # Get the image dimensions
-    image_shape = tf.shape(image)
-    height, width = image_shape[0], image_shape[1]
-
-    # Convert factors to tensors and cast them to float32
-    width_factor = tf.cast(width_factor, tf.float32)
-    height_factor = tf.cast(height_factor, tf.float32)
-
-    # Cast image dimensions to float32 to match the factor types
-    width = tf.cast(width, tf.float32)
-    height = tf.cast(height, tf.float32)
-
-    # Calculate the maximum shifts based on the image dimensions
-    max_width_shift = width * width_factor
-    max_height_shift = height * height_factor
-
-    # Generate random translation values within the given factors
-    tx = tf.random.uniform([], -max_width_shift, max_width_shift, dtype=tf.float32)
-    ty = tf.random.uniform([], -max_height_shift, max_height_shift, dtype=tf.float32)
-
-    # Create the translation matrix as a 1D array with 8 values
-    # [a, b, tx, d, e, ty, 0, 0]
-    translation_matrix = tf.concat(
-        [
-            tf.ones([1], dtype=tf.float32),  # a = 1
-            tf.zeros([1], dtype=tf.float32),  # b = 0
-            [tx],  # tx (horizontal shift)
-            tf.zeros([1], dtype=tf.float32),  # d = 0
-            tf.ones([1], dtype=tf.float32),  # e = 1
-            [ty],  # ty (vertical shift)
-            tf.zeros([2], dtype=tf.float32),  # [0, 0]
-        ],
-        axis=0,
-    )
-
-    # Apply the translation with `fill_mode="nearest"`
-    translated_image = tf.raw_ops.ImageProjectiveTransformV2(
-        images=tf.expand_dims(image, 0),
-        transforms=tf.reshape(translation_matrix, [1, 8]),  # Ensure 8 values
-        output_shape=tf.shape(image)[:2],
-        interpolation="BILINEAR",
-        fill_mode="NEAREST",
-    )
-
-    return tf.squeeze(translated_image)
-
-
-def vid2frames(inp_vid_pth, out_frames_dir):
-    os.makedirs(out_frames_dir, exist_ok=True)
-    inp_vid_name = os.path.basename(inp_vid_pth)
-    inp_vid_name_wo_ext, ext = os.path.splitext(inp_vid_name)
-    vidcap = cv2.VideoCapture(inp_vid_pth)
-    is_success, image = vidcap.read()
-    frame_number = 0
-
-    while is_success:
-        save_path_and_name = (
-            f"{out_frames_dir}/{inp_vid_name_wo_ext}_frame-{frame_number}.jpg"
-        )
-        cv2.imwrite(save_path_and_name, image)
-        is_success, image = vidcap.read()
-        frame_number += 1
-
-
-def vids2frames(vids_dir, frames_dir, execution_mode="multi-processing"):
-    vid_pth_list = []
-    frames_pth_list = []
-    for dirpath, dirnames, filenames in os.walk(vids_dir):
-        if len(filenames):
-            frames_pth = f"{frames_dir}/{dirpath.split(vids_dir)[-1]}"
-            for filename in filenames:
-                filepth = f"{dirpath}/{filename}"
-                vid_pth_list.append(filepth)
-                frames_pth_list.append(frames_pth)
-
-    if execution_mode == "loop":
-        # loop
-        for inp_vid_pth, out_frames_dir in tqdm(
-            list(zip(vid_pth_list, frames_pth_list))
-        ):
-            vid2frames(inp_vid_pth, out_frames_dir)
-
-    elif execution_mode == "multi-threading":
-        # multi threading
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = executor.map(vid2frames, vid_pth_list, frames_pth_list)
-            for _ in tqdm(results, total=len(vid_pth_list)):
-                pass
-
-    elif execution_mode == "multi-processing":
-        # multi processing
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            results = executor.map(vid2frames, vid_pth_list, frames_pth_list)
-            for _ in tqdm(results, total=len(vid_pth_list)):
-                pass
+import math
+from mlu_tools.utils import get_dynamic_path, count_files
+from mlu_tools.validation import (
+    validate_pixel_range_0_255,
+    validate_array_like,
+    validate_dir,
+)
 
 
 def frames2vid(frames_dir, output_video_path, fps):
     frame = cv2.imread(f"{frames_dir}/{os.listdir(frames_dir)[0]}")
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # Codec for .mp4
     frame_size = frame.shape[1::-1]
     out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
     for filename in sorted(os.listdir(frames_dir), key=extract_num_from_end):
@@ -386,3 +224,118 @@ class TFDataGenerator:
         return self.data_loader(
             X, batch_size=batch_size, expansion_factor=expansion_factor, **kwargs
         )
+
+
+def random_rotate(image, rotation_range):
+    """Rotate the image within the specified range and fill blank space with nearest neighbor."""
+    # Generate a random rotation angle in radians
+    theta = tf.random.uniform([], -rotation_range, rotation_range) * tf.constant(
+        3.14159265 / 180, dtype=tf.float32
+    )
+
+    # Get the image dimensions
+    image_shape = tf.shape(image)
+    height, width = image_shape[0], image_shape[1]
+
+    # Create the rotation matrix
+    rotation_matrix = tf.stack(
+        [
+            [tf.cos(theta), -tf.sin(theta), 0],
+            [tf.sin(theta), tf.cos(theta), 0],
+            [0, 0, 1],
+        ]
+    )
+
+    # Adjust for center-based rotation
+    translation_to_origin = tf.stack(
+        [[1, 0, -width / 2], [0, 1, -height / 2], [0, 0, 1]]
+    )
+
+    translation_back = tf.stack([[1, 0, width / 2], [0, 1, height / 2], [0, 0, 1]])
+
+    # Cast matrices to tf.float32 for compatibility
+    rotation_matrix = tf.cast(rotation_matrix, tf.float32)
+    translation_to_origin = tf.cast(translation_to_origin, tf.float32)
+    translation_back = tf.cast(translation_back, tf.float32)
+
+    # Perform matrix multiplication
+    transform_matrix = tf.linalg.matmul(
+        translation_back, tf.linalg.matmul(rotation_matrix, translation_to_origin)
+    )
+
+    # Extract the affine part of the transformation matrix (2x3 matrix for 2D transformation)
+    affine_matrix = transform_matrix[:2, :]
+
+    # Flatten the matrix into a 1D array and add [0, 0] to make it 8 elements
+    affine_matrix_8 = tf.concat(
+        [affine_matrix[0, :], affine_matrix[1, :], [0, 0]], axis=0
+    )
+
+    # Apply the transformation with `fill_mode="nearest"`
+    rotated_image = tf.raw_ops.ImageProjectiveTransformV2(
+        images=tf.expand_dims(image, 0),
+        transforms=tf.reshape(affine_matrix_8, [1, 8]),
+        output_shape=tf.shape(image)[:2],
+        interpolation="BILINEAR",
+        fill_mode="NEAREST",
+    )
+
+    return tf.squeeze(rotated_image)
+
+
+def random_translate(image, width_factor, height_factor):
+    """Randomly translate the image horizontally and vertically within the specified factors.
+
+    Args:
+        image: Input image tensor.
+        width_factor: Horizontal shift factor (0.1 means 10% of width).
+        height_factor: Vertical shift factor (0.1 means 10% of height).
+
+    Returns:
+        Translated image.
+    """
+    # Get the image dimensions
+    image_shape = tf.shape(image)
+    height, width = image_shape[0], image_shape[1]
+
+    # Convert factors to tensors and cast them to float32
+    width_factor = tf.cast(width_factor, tf.float32)
+    height_factor = tf.cast(height_factor, tf.float32)
+
+    # Cast image dimensions to float32 to match the factor types
+    width = tf.cast(width, tf.float32)
+    height = tf.cast(height, tf.float32)
+
+    # Calculate the maximum shifts based on the image dimensions
+    max_width_shift = width * width_factor
+    max_height_shift = height * height_factor
+
+    # Generate random translation values within the given factors
+    tx = tf.random.uniform([], -max_width_shift, max_width_shift, dtype=tf.float32)
+    ty = tf.random.uniform([], -max_height_shift, max_height_shift, dtype=tf.float32)
+
+    # Create the translation matrix as a 1D array with 8 values
+    # [a, b, tx, d, e, ty, 0, 0]
+    translation_matrix = tf.concat(
+        [
+            tf.ones([1], dtype=tf.float32),  # a = 1
+            tf.zeros([1], dtype=tf.float32),  # b = 0
+            [tx],  # tx (horizontal shift)
+            tf.zeros([1], dtype=tf.float32),  # d = 0
+            tf.ones([1], dtype=tf.float32),  # e = 1
+            [ty],  # ty (vertical shift)
+            tf.zeros([2], dtype=tf.float32),  # [0, 0]
+        ],
+        axis=0,
+    )
+
+    # Apply the translation with `fill_mode="nearest"`
+    translated_image = tf.raw_ops.ImageProjectiveTransformV2(
+        images=tf.expand_dims(image, 0),
+        transforms=tf.reshape(translation_matrix, [1, 8]),  # Ensure 8 values
+        output_shape=tf.shape(image)[:2],
+        interpolation="BILINEAR",
+        fill_mode="NEAREST",
+    )
+
+    return tf.squeeze(translated_image)
