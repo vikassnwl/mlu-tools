@@ -12,6 +12,7 @@ import tarfile
 import cv2
 from IPython.display import FileLink
 from datetime import datetime
+from mega import Mega
 
 
 def set_global_seed(seed_value):
@@ -38,6 +39,13 @@ def download(file_url, file_save_path, download_from="drive", force=False):
                 for chunk in response.iter_content(chunk_size=1024):
                     file.write(chunk)
                     bar.update(len(chunk))
+    elif download_from == "mega":
+        # Initialize Mega object
+        mega = Mega()
+        # Download the file
+        file = mega.download_url(file_url, dest_path=(os.path.dirname(file_save_path) or "."), 
+                        dest_filename=os.path.basename(file_save_path))
+        print(f"File downloaded: {file}")
     else:
         FILE_ID = file_url.split("/")[-2]
         download_url = f"https://drive.google.com/uc?id={FILE_ID}&export=download"
