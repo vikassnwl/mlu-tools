@@ -26,16 +26,17 @@ def classify_video(input_video_path,
         show (bool): True for showing each processed frame otherwise False
 
     Returns:
-        None
+        list(tuple): A list of tuples containing prediction info for each frame.
+                     (probas, pred_label, pred_class, pred_conf)
     """
+
+    os.makedirs(default_output_dir, exist_ok=True)
 
     # Open the input video
     cap = cv2.VideoCapture(input_video_path)
     
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    print(width, height)
 
     # Check if video opened successfully
     if not cap.isOpened():
@@ -60,13 +61,16 @@ def classify_video(input_video_path,
         # Create VideoWriter object
         out = cv2.VideoWriter(save_as, fourcc, fps, frame_size)
 
+    window_w = 720
+    dynamic_scale = int(width/window_w)
+
     if show:
         cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)  # Allow resizing
-        window_w = 720
-        dynamic_scale = int(width/window_w)
         window_h = int(window_w*height/width)
         cv2.resizeWindow("Frame", window_w, window_h)  # Set the window size
 
+
+    prediction_info = []
     # Process each frame
     while True:
         ret, frame = cap.read()
@@ -79,6 +83,8 @@ def classify_video(input_video_path,
         pred_label = probas.argmax()
         pred_class = labels_dict[pred_label]
         pred_conf = probas[pred_label]
+
+        prediction_info.append((probas, pred_label, pred_class, pred_conf))
 
         # Write text on the frame
         position = (50, 50*dynamic_scale)  # Text position (x, y)
@@ -107,3 +113,5 @@ def classify_video(input_video_path,
         print(f"Processed video saved at {save_as}")
         out.release()
     if show: cv2.destroyAllWindows()
+
+    return prediction_info
