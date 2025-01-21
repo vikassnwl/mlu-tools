@@ -7,13 +7,17 @@ from pathlib import Path
 def validate_file(path, valid_types=[], raise_exception=True):
     param_name = "path"
     if not os.path.exists(path):
-        raise Exception(f"{param_name}='{path}' does not exist!")
+        if raise_exception:
+            raise Exception(f"{param_name}='{path}' does not exist!")
+        return False
 
     if not os.path.isfile(path):
-        raise Exception(f"{param_name}='{path}' is not a file!")
+        if raise_exception:
+            raise Exception(f"{param_name}='{path}' is not a file!")
+        return False
 
     if not valid_types:
-        return
+        return True
 
     for valid_type in valid_types:
         path_wo_ext, ext = os.path.splitext(path)
@@ -58,7 +62,7 @@ def validate_file(path, valid_types=[], raise_exception=True):
             raise Exception(
                 f"{param_name}='{path}' is not in the specified valid_types:\n{valid_types}"
             )
-        else: return False
+        return False
 
     return valid_type
 
