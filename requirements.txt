@@ -39,7 +39,7 @@ matplotlib==3.10.0
 matplotlib-inline==0.1.7
 mdurl==0.1.2
 mediapipe==0.10.20
-mega.py==1.0.8
+git+https://github.com/vikassnwl/mega.py.git
 ml-dtypes==0.3.2
 namex==0.0.8
 nest-asyncio==1.6.0

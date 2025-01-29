@@ -141,6 +141,7 @@ def unpack_archive(file_path, target_dir=".", force=False):
             tar_ref.extractall(target_dir)
 
     print(f"Archive unpacked to {unpacked_dir}")
+    return unpacked_dir
 
 
 def count_files(directory):
