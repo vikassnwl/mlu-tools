@@ -30,6 +30,10 @@ def download(file_url, file_save_path, download_from="drive", force=False):
     if os.path.exists(file_save_path) and not force:
         print("File already exists!")
         return
+    
+    if os.path.dirname(file_save_path):
+        os.makedirs(os.path.dirname(file_save_path), exist_ok=True)
+
     if download_from == "web":
         response = requests.get(file_url, stream=True)
         total_size = int(response.headers.get("content-length", 0))
@@ -102,7 +106,8 @@ def download_yt_playlist(playlist_url, quality="best"):
     print(f"Playlist downloaded successfully as {quality} quality MP4!")
 
 
-def unpack_archive(file_path, target_dir=".", force=False):
+def unpack_archive(file_path, target_dir=None, force=False):
+    target_dir = target_dir or (os.path.dirname(file_path) if os.path.dirname(file_path) else ".")
     # Extract the root directory from the archive
     if file_path.endswith(".zip"):
         with zipfile.ZipFile(file_path, "r") as zip_ref:
