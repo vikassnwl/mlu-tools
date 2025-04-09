@@ -108,42 +108,37 @@ def download_yt_playlist(playlist_url, quality="best"):
 
 def unpack_archive(file_path, target_dir=None, force=False):
     target_dir = target_dir or (os.path.dirname(file_path) if os.path.dirname(file_path) else ".")
-    # Extract the root directory from the archive
+    
+    # Determine archive type and get root dir
     if file_path.endswith(".zip"):
         with zipfile.ZipFile(file_path, "r") as zip_ref:
-            root_dir = zip_ref.namelist()[0].split("/")[
-                0
-            ]  # First part of the first file path
-    elif (
-        file_path.endswith(".tar")
-        or file_path.endswith(".tar.gz")
-        or file_path.endswith(".tgz")
-    ):
+            members = zip_ref.namelist()
+            root_dir = members[0].split("/")[0]
+    elif file_path.endswith((".tar", ".tar.gz", ".tgz")):
         with tarfile.open(file_path, "r") as tar_ref:
-            root_dir = tar_ref.getnames()[0].split("/")[
-                0
-            ]  # First part of the first file path
+            members = tar_ref.getnames()
+            root_dir = members[0].split("/")[0]
     else:
         print("Unsupported file type")
         return
 
-    # Check if the root directory already exists in the target directory
-    unpacked_dir = os.path.join(target_dir, root_dir)
+    # unpacked_dir = os.path.join(target_dir, root_dir)
+    unpacked_dir = target_dir
     if os.path.exists(unpacked_dir) and not force:
         print(f"{unpacked_dir} already exists. Skipping unpacking.")
         return
 
-    # Unpack the archive
+    # Unpack with progress bar
+    print(f"Unpacking {file_path} to {target_dir}...")
+    
     if file_path.endswith(".zip"):
         with zipfile.ZipFile(file_path, "r") as zip_ref:
-            zip_ref.extractall(target_dir)
-    elif (
-        file_path.endswith(".tar")
-        or file_path.endswith(".tar.gz")
-        or file_path.endswith(".tgz")
-    ):
+            for member in tqdm(members, desc="Extracting", unit="file"):
+                zip_ref.extract(member, target_dir)
+    elif file_path.endswith((".tar", ".tar.gz", ".tgz")):
         with tarfile.open(file_path, "r") as tar_ref:
-            tar_ref.extractall(target_dir)
+            for member in tqdm(members, desc="Extracting", unit="file"):
+                tar_ref.extract(member, target_dir)
 
     print(f"Archive unpacked to {unpacked_dir}")
     return unpacked_dir
