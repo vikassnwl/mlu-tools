@@ -27,12 +27,16 @@ def set_global_seed(seed_value):
 
 
 def download(file_url, file_save_path, download_from="drive", force=False):
+    dest_path = os.path.dirname(file_save_path)
+    dest_filename = os.path.basename(file_save_path)
+    print(f"Downloading {dest_filename} to {dest_path}/...")
     if os.path.exists(file_save_path) and not force:
-        print("File already exists!")
+        # print("File already exists!\n")
+        print(f"{file_save_path} already exists. Skipping download.\n")
         return
     
-    if os.path.dirname(file_save_path):
-        os.makedirs(os.path.dirname(file_save_path), exist_ok=True)
+    if dest_path:
+        os.makedirs(dest_path, exist_ok=True)
 
     if download_from == "web":
         response = requests.get(file_url, stream=True)
@@ -47,9 +51,9 @@ def download(file_url, file_save_path, download_from="drive", force=False):
         # Initialize Mega object
         mega = Mega()
         # Download the file
-        file = mega.download_url(file_url, dest_path=(os.path.dirname(file_save_path) or "."), 
-                        dest_filename=os.path.basename(file_save_path))
-        print(f"File downloaded: {file}")
+        file = mega.download_url(file_url, dest_path=(dest_path or "."), 
+                        dest_filename=dest_filename)
+        print(f"File downloaded at {file}\n")
     else:
         FILE_ID = file_url.split("/")[-2]
         download_url = f"https://drive.google.com/uc?id={FILE_ID}&export=download"
@@ -124,13 +128,12 @@ def unpack_archive(file_path, target_dir=None, force=False):
 
     # unpacked_dir = os.path.join(target_dir, root_dir)
     unpacked_dir = target_dir
+    print(f"Unpacking {file_path} to {target_dir}...")
     if os.path.exists(unpacked_dir) and not force:
-        print(f"{unpacked_dir} already exists. Skipping unpacking.")
+        print(f"{unpacked_dir} already exists. Skipping unpacking.\n")
         return
 
     # Unpack with progress bar
-    print(f"Unpacking {file_path} to {target_dir}...")
-    
     if file_path.endswith(".zip"):
         with zipfile.ZipFile(file_path, "r") as zip_ref:
             for member in tqdm(members, desc="Extracting", unit="file"):
@@ -140,7 +143,7 @@ def unpack_archive(file_path, target_dir=None, force=False):
             for member in tqdm(members, desc="Extracting", unit="file"):
                 tar_ref.extract(member, target_dir)
 
-    print(f"Archive unpacked to {unpacked_dir}")
+    print(f"Archive unpacked to {unpacked_dir}\n")
     return unpacked_dir
 
 
