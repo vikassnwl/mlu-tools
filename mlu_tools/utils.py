@@ -146,11 +146,17 @@ def unpack_archive(file_path, target_dir=None, force=False):
     if file_path.endswith(".zip"):
         with zipfile.ZipFile(file_path, "r") as zip_ref:
             for member in tqdm(members, desc="Extracting", unit="file"):
-                zip_ref.extract(member, unpacked_dir)
+                if archive_contains_a_root_folder:
+                    zip_ref.extract(member, target_dir)
+                else:
+                    zip_ref.extract(member, unpacked_dir)
     elif file_path.endswith((".tar", ".tar.gz", ".tgz")):
         with tarfile.open(file_path, "r") as tar_ref:
             for member in tqdm(members, desc="Extracting", unit="file"):
-                tar_ref.extract(member, unpacked_dir)
+                if archive_contains_a_root_folder:
+                    tar_ref.extract(member, target_dir)
+                else:
+                    tar_ref.extract(member, unpacked_dir)
 
     print(f"Archive unpacked to {unpacked_dir}\n")
     return unpacked_dir
