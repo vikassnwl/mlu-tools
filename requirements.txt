@@ -39,7 +39,7 @@ matplotlib==3.10.0
 matplotlib-inline==0.1.7
 mdurl==0.1.2
 mediapipe==0.10.20
-mega-x==1.0.9.dev0
+mega-x==1.0.9.dev1
 ml-dtypes==0.3.2
 namex==0.0.8
 nest-asyncio==1.6.0
@@ -76,7 +76,7 @@ six==1.17.0
 sounddevice==0.5.1
 soupsieve==2.6
 stack-data==0.6.3
-tenacity==5.1.5
+tenacity==9.1.2
 tensorboard==2.16.2
 tensorboard-data-server==0.7.2
 tensorflow==2.16.1
