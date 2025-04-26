@@ -7,12 +7,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import math
-from mlu_tools.utils import get_dynamic_path, count_files
-from mlu_tools.validation import (
-    validate_pixel_range_0_255,
-    validate_array_like,
-    validate_dir,
-)
+
 
 
 def frames2vid(frames_dir, output_video_path, fps):
@@ -92,139 +87,160 @@ def perform_oversampling(dir_pth, target_size):
             num_iters -= 1
 
 
+def process_path(file_path, image_size, crop_to_aspect_ratio):
+    label = tf.strings.split(file_path, os.sep)[-2]
+    label = int(label)
+    img = tf.io.read_file(file_path)
+    img = tf.image.decode_jpeg(img, channels=3)
+    # img = tf.image.resize(img, image_size)  # doesn't support center cropping
+    img = tf.keras.layers.Resizing(*image_size, crop_to_aspect_ratio=crop_to_aspect_ratio)(img)
+
+    return img, label
+
+
+def get_affine_transform_vector(theta, tx, ty, shear, zx, zy, image_height, image_width):
+    # theta = math.radians(theta)
+    theta = tf.math.multiply(theta, tf.constant(math.pi / 180.0))
+    # shear = math.radians(shear)
+    shear = tf.math.multiply(shear, tf.constant(math.pi / 180.0))
+
+    # Center of the image
+    cx, cy = image_width / 2.0, image_height / 2.0
+
+    # Rotation
+    rotation = tf.convert_to_tensor([
+        [tf.cos(theta), -tf.sin(theta)],
+        [tf.sin(theta), tf.cos(theta)]
+    ], dtype=tf.float32)
+
+    # Shear
+    shear_matrix = tf.convert_to_tensor([
+        [1.0, -tf.sin(shear)],
+        [0.0, tf.cos(shear)]
+    ], dtype=tf.float32)
+
+    # Zoom
+    zoom = tf.convert_to_tensor([
+        [zx, 0.0],
+        [0.0, zy]
+    ], dtype=tf.float32)
+
+    # Composite transform
+    transform = tf.linalg.matmul(rotation, tf.linalg.matmul(shear_matrix, zoom))
+
+    # Offset for center + translation
+    offset = tf.convert_to_tensor([
+        cx - (transform[0, 0] * cx + transform[0, 1] * cy) + tx,
+        cy - (transform[1, 0] * cx + transform[1, 1] * cy) + ty
+    ], dtype=tf.float32)
+
+    # 8-element vector with 2 zeros at the end
+    flat_transform = tf.stack([
+        transform[0, 0], transform[0, 1], offset[0],
+        transform[1, 0], transform[1, 1], offset[1],
+        0.0, 0.0
+    ])
+    
+    return flat_transform
+
+
+def apply_affine_transform_tf(
+    x,
+    rotation_range=0,
+    height_shift_range=0,
+    width_shift_range=0,
+    shear_range=0,
+    zoom_range=0,
+    horizontal_flip=False,
+    fill_mode='NEAREST',
+    interpolation='BILINEAR',
+    fill_value=0.0
+):
+    """
+    Apply affine transform to a single image tensor (H, W, C).
+    """
+
+    # print(x.shape)
+
+    if rotation_range:
+        # theta = np.random.uniform(-rotation_range, rotation_range)
+        theta = tf.random.uniform([], minval=-rotation_range, maxval=rotation_range)
+    else:
+        theta = 0.0
+
+    if width_shift_range:
+        ty = tf.random.uniform([], -width_shift_range, width_shift_range)
+        ty *= tf.cast(tf.shape(x)[1], tf.float32)
+    else:
+        ty = tf.constant(0.0, dtype=tf.float32)
+
+    if height_shift_range:
+        tx = tf.random.uniform([], -height_shift_range, height_shift_range)
+        tx *= tf.cast(tf.shape(x)[0], tf.float32)
+    else:
+        tx = tf.constant(0.0, dtype=tf.float32)
+
+    if shear_range:
+        shear = tf.random.uniform([], -shear_range, shear_range)
+    else:
+        shear = 0.0
+
+    zoom_range = [1 - zoom_range, 1 + zoom_range]
+    if zoom_range[0] == 1 and zoom_range[1] == 1:
+        zx, zy = 1, 1
+    else:
+        ## Non-Uniform Zooming across Width and Height
+        zx, zy = tf.unstack(tf.random.uniform(
+            [2], zoom_range[0], zoom_range[1]
+        ))
+        ## Uniform Zooming across Width and Height
+        # zx = tf.random.uniform([], zoom_range[0], zoom_range[1])
+        # zy = zx
+
+    if horizontal_flip and tf.random.uniform([], 0.0, 1.0) < 0.5:
+        x = tf.reverse(x, axis=[1])
+
+    if len(x.shape) != 3:
+        raise ValueError("Input must be a 3D tensor [height, width, channels]")
+
+    shape = tf.shape(x)
+    height, width = shape[0], shape[1]
+
+    transform = get_affine_transform_vector(
+        theta, tx, ty, shear, zx, zy,
+        tf.cast(height, tf.float32),
+        tf.cast(width, tf.float32)
+    )
+
+    transform = tf.reshape(transform, [1, 8])  # shape: [1, 8]
+    x = tf.expand_dims(x, axis=0)  # shape: [1, H, W, C]
+
+    transformed = tf.raw_ops.ImageProjectiveTransformV3(
+        images=x,
+        transforms=transform,
+        output_shape=tf.stack([height, width]),
+        interpolation=interpolation,
+        fill_mode=fill_mode,
+        fill_value=fill_value
+    )
+
+    return tf.squeeze(transformed, axis=0)  # shape: [H, W, C]
+
+
 class TFDataGenerator:
     def __init__(self, **kwargs):
-        valid_args = {
-            "brightness_range",
-            "contrast_range",
-            "horizontal_flip",
-            "rotation_range",
-            "height_shift_range",
-            "width_shift_range",
-            "zoom_range",
-            "hue_range",
-            "saturation_range",
-            "rescale",
-        }
-        invalid_args = set(kwargs) - valid_args
-        if invalid_args:
-            raise Exception(f"Invalid arguments: {invalid_args}")
         self.kwargs = kwargs
-        fill_mode = kwargs.get("fill_mode", "reflect")
 
-        self.transformations = []
-        if "brightness_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.RandomBrightness(kwargs["brightness_range"])
-            )  # valid factor 0-1
-        if "contrast_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.RandomContrast(kwargs["contrast_range"])
-            )  # [1-lower, 1+upper], lower=upper if factor is a single value
-        if "horizontal_flip" in kwargs and kwargs["horizontal_flip"] == True:
-            self.transformations.append(tf.keras.layers.RandomFlip("horizontal"))
-        if "rotation_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.RandomRotation(
-                    kwargs["rotation_range"] / 360, fill_mode=fill_mode
-                )
-            )
-        if "height_shift_range" in kwargs or "width_shift_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.RandomTranslation(
-                    kwargs.get("height_shift_range", 0),
-                    kwargs.get("width_shift_range", 0),
-                    fill_mode=fill_mode,
-                )
-            )
-        if "zoom_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.RandomZoom(kwargs["zoom_range"], fill_mode=fill_mode)
-            )
-        if "hue_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.Lambda(
-                    lambda X: tf.image.random_hue(X, kwargs["hue_range"])
-                )
-            )
-        if "saturation_range" in kwargs:
-            self.transformations.append(
-                tf.keras.layers.Lambda(
-                    lambda X: tf.image.random_saturation(X, *kwargs["saturation_range"])
-                )
-            )
-
-        # Rescale in the end of all the transformations
-        if "rescale" in kwargs:
-            self.transformations.append(tf.keras.layers.Rescaling(kwargs["rescale"]))
-
-    def data_loader(
-        self,
-        X,
-        y=None,
-        buffer_size=1000,
-        batch_size=32,
-        expansion_factor=None,
-        **kwargs,
-    ):
-        if isinstance(X, str):
-            dataset = tf.keras.preprocessing.image_dataset_from_directory(
-                X, batch_size=batch_size, **kwargs
-            )
-        else:
-            if "brightness_range" in self.kwargs or "contrast_range" in self.kwargs:
-                custom_message = (
-                    "In order to apply brightness or contrast adjustments to the input image, pixel values must be in the range of 0 to 255."
-                    "\nEnsure that the image has appropriate pixel values, and if needed, rescale it using the rescale argument of TFDataGenerator."
-                )
-                validate_pixel_range_0_255(X, custom_message=custom_message)
-            # Create a tf.data.Dataset from the variables
-            if y is None:
-                dataset = tf.data.Dataset.from_tensor_slices(X)
-            else:
-                dataset = tf.data.Dataset.from_tensor_slices((X, y))
-            # Shuffle and batch the dataset
-            dataset = dataset.shuffle(buffer_size).batch(batch_size)
-        if self.transformations != []:
-            # Apply data augmentation to the dataset
-            transformations_pipeline = tf.keras.Sequential(self.transformations)
-
-            def wrapper1(*args):
-                return transformations_pipeline(args[0])
-
-            def wrapper2(*args):
-                return transformations_pipeline(args[0]), args[1]
-
-            wrapper = wrapper1 if y is None and not isinstance(X, str) else wrapper2
+    def flow_from_directory(self, dir_pth, shuffle=True, image_size=(256, 256), crop_to_aspect_ratio=False):
+        dataset = tf.data.Dataset.list_files(f"{dir_pth}/*/*", shuffle=shuffle)
+        dataset = dataset.map(lambda x: process_path(x, image_size, crop_to_aspect_ratio), num_parallel_calls=tf.data.AUTOTUNE)
+        if self.kwargs:
             dataset = dataset.map(
-                wrapper,
-                num_parallel_calls=tf.data.AUTOTUNE,  # Enable parallel processing
+                lambda x, y: (apply_affine_transform_tf(x, **self.kwargs), y),
+                num_parallel_calls=tf.data.AUTOTUNE,
             )
-            if expansion_factor:
-                # Create an additional dataset that contains 50% of the original dataset
-                total_items = count_files(X) if isinstance(X, str) else len(X)
-                additional_data = dataset.take(
-                    int(np.ceil(total_items * expansion_factor / batch_size))
-                ).map(wrapper, num_parallel_calls=tf.data.AUTOTUNE)
-                dataset = dataset.concatenate(additional_data)
-
-        # Add prefetching for performance
-        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-
         return dataset
-
-    def flow(self, X, y=None, buffer_size=1000, batch_size=32, expansion_factor=None):
-        validate_array_like(X)
-        return self.data_loader(
-            X, y, buffer_size, batch_size, expansion_factor=expansion_factor
-        )
-
-    def flow_from_directory(self, X, batch_size=32, expansion_factor=None, **kwargs):
-        validate_dir(X)
-        return self.data_loader(
-            X, batch_size=batch_size, expansion_factor=expansion_factor, **kwargs
-        )
-
+    
 
 def random_rotate(image, rotation_range):
     """Rotate the image within the specified range and fill blank space with nearest neighbor."""
