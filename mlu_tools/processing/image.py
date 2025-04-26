@@ -244,7 +244,12 @@ class TFDataGenerator:
         self.kwargs = kwargs
 
     def flow_from_directory(
-        self, dir_pth, shuffle=True, image_size=(256, 256), crop_to_aspect_ratio=False
+        self,
+        dir_pth,
+        shuffle=True,
+        image_size=(256, 256),
+        crop_to_aspect_ratio=False,
+        batch_size=32,
     ):
         dataset = tf.data.Dataset.list_files(f"{dir_pth}/*/*", shuffle=shuffle)
         dataset = dataset.map(
@@ -256,6 +261,9 @@ class TFDataGenerator:
                 lambda x, y: (apply_affine_transform_tf(x, **self.kwargs), y),
                 num_parallel_calls=tf.data.AUTOTUNE,
             )
+        dataset = (
+            dataset.repeat().batch(batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
+        )
         return dataset
 
 
