@@ -89,7 +89,7 @@ def perform_oversampling(dir_pth, target_size):
 def process_path(file_path, image_size, crop_to_aspect_ratio):
     label = tf.strings.split(file_path, os.sep)[-2]
     # label = int(label)
-    label = tf.cast(label, dtype=tf.int32)
+    label = tf.strings.to_number(label, out_type=tf.int32)
     img = tf.io.read_file(file_path)
     img = tf.image.decode_jpeg(img, channels=3)
     # img = tf.image.resize(img, image_size)  # doesn't support center cropping
@@ -261,10 +261,10 @@ class TFDataGenerator:
             dataset = dataset.map(
                 lambda x, y: (apply_affine_transform_tf(x, **self.kwargs), y),
                 num_parallel_calls=tf.data.AUTOTUNE,
-            )
-        dataset = (
-            dataset.repeat().batch(batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
-        )
+            ).repeat()
+        dataset = dataset.batch(
+            batch_size, num_parallel_calls=tf.data.AUTOTUNE
+        ).prefetch(buffer_size=tf.data.AUTOTUNE)
         return dataset
 
 
