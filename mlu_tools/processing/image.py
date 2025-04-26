@@ -1,13 +1,12 @@
 import os
 import cv2
-from mlu_tools.utils import extract_num_from_end
+from mlu_tools.utils import extract_num_from_end, get_dynamic_path
 import shutil
 import random
 import numpy as np
 import tensorflow as tf
 import pandas as pd
 import math
-
 
 
 def frames2vid(frames_dir, output_video_path, fps):
@@ -93,12 +92,16 @@ def process_path(file_path, image_size, crop_to_aspect_ratio):
     img = tf.io.read_file(file_path)
     img = tf.image.decode_jpeg(img, channels=3)
     # img = tf.image.resize(img, image_size)  # doesn't support center cropping
-    img = tf.keras.layers.Resizing(*image_size, crop_to_aspect_ratio=crop_to_aspect_ratio)(img)
+    img = tf.keras.layers.Resizing(
+        *image_size, crop_to_aspect_ratio=crop_to_aspect_ratio
+    )(img)
 
     return img, label
 
 
-def get_affine_transform_vector(theta, tx, ty, shear, zx, zy, image_height, image_width):
+def get_affine_transform_vector(
+    theta, tx, ty, shear, zx, zy, image_height, image_width
+):
     # theta = math.radians(theta)
     theta = tf.math.multiply(theta, tf.constant(math.pi / 180.0))
     # shear = math.radians(shear)
@@ -108,39 +111,45 @@ def get_affine_transform_vector(theta, tx, ty, shear, zx, zy, image_height, imag
     cx, cy = image_width / 2.0, image_height / 2.0
 
     # Rotation
-    rotation = tf.convert_to_tensor([
-        [tf.cos(theta), -tf.sin(theta)],
-        [tf.sin(theta), tf.cos(theta)]
-    ], dtype=tf.float32)
+    rotation = tf.convert_to_tensor(
+        [[tf.cos(theta), -tf.sin(theta)], [tf.sin(theta), tf.cos(theta)]],
+        dtype=tf.float32,
+    )
 
     # Shear
-    shear_matrix = tf.convert_to_tensor([
-        [1.0, -tf.sin(shear)],
-        [0.0, tf.cos(shear)]
-    ], dtype=tf.float32)
+    shear_matrix = tf.convert_to_tensor(
+        [[1.0, -tf.sin(shear)], [0.0, tf.cos(shear)]], dtype=tf.float32
+    )
 
     # Zoom
-    zoom = tf.convert_to_tensor([
-        [zx, 0.0],
-        [0.0, zy]
-    ], dtype=tf.float32)
+    zoom = tf.convert_to_tensor([[zx, 0.0], [0.0, zy]], dtype=tf.float32)
 
     # Composite transform
     transform = tf.linalg.matmul(rotation, tf.linalg.matmul(shear_matrix, zoom))
 
     # Offset for center + translation
-    offset = tf.convert_to_tensor([
-        cx - (transform[0, 0] * cx + transform[0, 1] * cy) + tx,
-        cy - (transform[1, 0] * cx + transform[1, 1] * cy) + ty
-    ], dtype=tf.float32)
+    offset = tf.convert_to_tensor(
+        [
+            cx - (transform[0, 0] * cx + transform[0, 1] * cy) + tx,
+            cy - (transform[1, 0] * cx + transform[1, 1] * cy) + ty,
+        ],
+        dtype=tf.float32,
+    )
 
     # 8-element vector with 2 zeros at the end
-    flat_transform = tf.stack([
-        transform[0, 0], transform[0, 1], offset[0],
-        transform[1, 0], transform[1, 1], offset[1],
-        0.0, 0.0
-    ])
-    
+    flat_transform = tf.stack(
+        [
+            transform[0, 0],
+            transform[0, 1],
+            offset[0],
+            transform[1, 0],
+            transform[1, 1],
+            offset[1],
+            0.0,
+            0.0,
+        ]
+    )
+
     return flat_transform
 
 
@@ -152,9 +161,9 @@ def apply_affine_transform_tf(
     shear_range=0,
     zoom_range=0,
     horizontal_flip=False,
-    fill_mode='NEAREST',
-    interpolation='BILINEAR',
-    fill_value=0.0
+    fill_mode="NEAREST",
+    interpolation="BILINEAR",
+    fill_value=0.0,
 ):
     """
     Apply affine transform to a single image tensor (H, W, C).
@@ -190,9 +199,7 @@ def apply_affine_transform_tf(
         zx, zy = 1, 1
     else:
         ## Non-Uniform Zooming across Width and Height
-        zx, zy = tf.unstack(tf.random.uniform(
-            [2], zoom_range[0], zoom_range[1]
-        ))
+        zx, zy = tf.unstack(tf.random.uniform([2], zoom_range[0], zoom_range[1]))
         ## Uniform Zooming across Width and Height
         # zx = tf.random.uniform([], zoom_range[0], zoom_range[1])
         # zy = zx
@@ -207,9 +214,14 @@ def apply_affine_transform_tf(
     height, width = shape[0], shape[1]
 
     transform = get_affine_transform_vector(
-        theta, tx, ty, shear, zx, zy,
+        theta,
+        tx,
+        ty,
+        shear,
+        zx,
+        zy,
         tf.cast(height, tf.float32),
-        tf.cast(width, tf.float32)
+        tf.cast(width, tf.float32),
     )
 
     transform = tf.reshape(transform, [1, 8])  # shape: [1, 8]
@@ -221,7 +233,7 @@ def apply_affine_transform_tf(
         output_shape=tf.stack([height, width]),
         interpolation=interpolation,
         fill_mode=fill_mode,
-        fill_value=fill_value
+        fill_value=fill_value,
     )
 
     return tf.squeeze(transformed, axis=0)  # shape: [H, W, C]
@@ -231,16 +243,21 @@ class TFDataGenerator:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
-    def flow_from_directory(self, dir_pth, shuffle=True, image_size=(256, 256), crop_to_aspect_ratio=False):
+    def flow_from_directory(
+        self, dir_pth, shuffle=True, image_size=(256, 256), crop_to_aspect_ratio=False
+    ):
         dataset = tf.data.Dataset.list_files(f"{dir_pth}/*/*", shuffle=shuffle)
-        dataset = dataset.map(lambda x: process_path(x, image_size, crop_to_aspect_ratio), num_parallel_calls=tf.data.AUTOTUNE)
+        dataset = dataset.map(
+            lambda x: process_path(x, image_size, crop_to_aspect_ratio),
+            num_parallel_calls=tf.data.AUTOTUNE,
+        )
         if self.kwargs:
             dataset = dataset.map(
                 lambda x, y: (apply_affine_transform_tf(x, **self.kwargs), y),
                 num_parallel_calls=tf.data.AUTOTUNE,
             )
         return dataset
-    
+
 
 def random_rotate(image, rotation_range):
     """Rotate the image within the specified range and fill blank space with nearest neighbor."""
